@@ -1,0 +1,25 @@
+{
+  "name": "flowerpower",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@preact/signals": "2.11.3",
+    "preact": "10.29.8",
+    "qrcode": "1.5.4",
+    "trystero": "0.26.0",
+    "yjs": "13.6.33"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "2.10.6",
+    "@types/qrcode": "1.5.6",
+    "typescript": "5.9.3",
+    "vite": "7.3.7",
+    "vite-plugin-pwa": "2.0.0"
+  }
+}
