@@ -6,7 +6,7 @@ import { compressImage, photoUrl } from '../lib/image'
 import { ownKey, type RatingData } from '../lib/model'
 import { ASH, AROMA_GROUPS, BURN, COMBUSTION, EFFECTS, FORMS, QUALITY, SIDE_EFFECTS, SOURCES, VAPE } from '../lib/taxonomy'
 import { Art, back, ChipArt, ChipSelect, Empty, go, HeroArt, Icon, LevelChips, MiniStars, PageHead, PhotoInput, route, Seg, SingleSelect, Slider, Stars, toast } from './kit'
-import { useData } from './data'
+import { myStatus, useData } from './data'
 import { MILESTONES, confetti } from '../lib/confetti'
 
 const today = () => new Date().toISOString().slice(0, 10)
@@ -44,7 +44,8 @@ export function RateForm() {
   const [busy, setBusy] = useState(false)
 
   const strain = strainId ? d.strainMap.get(strainId) : undefined
-  const isGroup = share === 'gruppe' && !!d.rt
+  const muted = !!d.rt && myStatus(d.snap, me.id).muted
+  const isGroup = share === 'gruppe' && !!d.rt && !muted
 
   const save = async () => {
     if (!strainId || !overall) return
@@ -248,7 +249,8 @@ export function RateForm() {
         </div>
       </Section>
 
-      {d.rt && !session && (
+      {muted && <div class="banner warn mt">🔇 Du bist stummgeschaltet – diese Notiz wird privat gespeichert.</div>}
+      {d.rt && !session && !muted && (
         <Section n={8} done title="Sichtbar für">
           <Seg
             value={share}

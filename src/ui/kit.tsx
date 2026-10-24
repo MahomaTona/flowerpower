@@ -52,6 +52,9 @@ const paths: Record<string, string> = {
   edit: 'M4 20h4L19 9l-4-4L4 16zM14 6l4 4',
   close: 'M6 6l12 12M18 6L6 18',
   chat: 'M4 5h16v11H9l-5 4z',
+  more: 'M5 12h.01M12 12h.01M19 12h.01',
+  calendar: 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4',
+  shield: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z',
 }
 export const Icon = ({ name, class: cls }: { name: string; class?: string }) => (
   <svg class={'ico ' + (cls ?? '')} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

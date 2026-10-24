@@ -2,7 +2,7 @@ import { render } from 'preact'
 import { useEffect } from 'preact/hooks'
 import { registerSW } from 'virtual:pwa-register'
 import './styles.css'
-import { activeGroup, boot, groups, groupsTick, lockNow, pairRequest, phase, setActiveGroup } from './lib/app'
+import { activeGroup, boot, groups, groupsTick, lockNow, me, pairRequest, phase, setActiveGroup } from './lib/app'
 import { appName, autoLock, pendingInvite } from './lib/prefs'
 import { Aurora, BloomLogo, Icon, Logo, Sheet, Toast, go, route } from './ui/kit'
 import { LockScreen, Welcome } from './ui/Start'
@@ -13,6 +13,8 @@ import { SessionView, Sessions } from './ui/Sessions'
 import { Me } from './ui/Me'
 import { Settings } from './ui/Settings'
 import { GroupPage, JoinInvite } from './ui/Group'
+import { EventDetail, EventForm, EventsPage } from './ui/Events'
+import { attentionCount } from './ui/Moderation'
 
 if (import.meta.env.PROD) registerSW({ immediate: true })
 
@@ -57,7 +59,7 @@ const NAV = [
   ['feed', 'Feed', 'feed'],
   ['strains', 'Sorten', 'strains'],
   ['rate', 'Bewerten', 'plus'],
-  ['sessions', 'Tasting', 'session'],
+  ['events', 'Treffen', 'calendar'],
   ['me', 'Ich', 'me'],
 ] as const
 
@@ -67,7 +69,9 @@ function Shell() {
   const page = r.parts[0] ?? 'feed'
   const rt = activeGroup.value
   const peers = rt ? Object.keys(rt.peering?.peers.value ?? {}).length : 0
-  const navOn = (k: string) => page === k || (k === 'strains' && (page === 'strain' || page === 'strain-new' || page === 'compare')) || (k === 'sessions' && page === 'session')
+  if (rt) rt.model.version.value
+  const attention = rt && me.value ? attentionCount(rt.model.snapshot(), me.value.id) : 0
+  const navOn = (k: string) => page === k || (k === 'strains' && (page === 'strain' || page === 'strain-new' || page === 'compare')) || (k === 'events' && ['event', 'event-new', 'sessions', 'session'].includes(page))
   return (
     <div class="shell">
       <nav class="nav" aria-label="Hauptnavigation">
@@ -111,6 +115,11 @@ function Shell() {
               <span class={'online' + (peers ? ' on' : '')} title={`${peers} verbunden`}>
                 <i /> {peers}
               </span>
+              {attention > 0 && (
+                <span class="attention" aria-label={`${attention} offene Punkte`}>
+                  {attention}
+                </span>
+              )}
             </button>
           ) : (
             <button class="btn sm" onClick={() => go('/group')}>
@@ -146,6 +155,12 @@ function Page({ page, id }: { page: string; id?: string }) {
       return <Compare />
     case 'rate':
       return <RateForm key={location.hash} />
+    case 'events':
+      return <EventsPage />
+    case 'event':
+      return <EventDetail id={id ?? ''} key={id} />
+    case 'event-new':
+      return <EventForm key={location.hash} />
     case 'sessions':
       return <Sessions />
     case 'session':

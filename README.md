@@ -17,7 +17,15 @@ und werden direkt zwischen euch per WebRTC abgeglichen.
 - **4 Themes:** Cuvée (edel/dunkel), Leinen (hell/clean), Flower Power (bunt), Mitternacht (OLED)
 - **Diskreter Modus:** PIN-Sperre, verschlüsselte Daten, neutraler Name „Notizen“ und neutrales Icon
 - **Mehrere eigene Geräte** per QR-Code koppeln, **verschlüsselte Sicherungsdatei**
-- **Admins** können Mitglieder entfernen – die Gruppe zieht dann automatisch in einen neuen, geheimen Raum um
+- **Treffen:** Tasting-Abende vorschlagen (Datum, Ort, geplante Sorten), zu-/absagen, Mitbring-Liste,
+  Kalender-Export (.ics) – aus einer geplanten Sorte startet per Tipp das Live-Tasting
+- **Wartebereich:** Wer nur das Passwort kennt, bleibt unsichtbar, bis ein Mitglied ihn freigibt
+- **Admins** können Beiträge ausblenden, Mitglieder stummschalten oder sofort entfernen
+- **Abstimmungen:** Jedes Mitglied kann abstimmen lassen (entfernen, stummschalten, ausblenden) –
+  angenommen mit ⅔ der Abstimmenden nach 48 h (mind. 3 Stimmen) oder sofort bei ⅔ aller Mitglieder
+- **Melden-Knopf** an jedem Beitrag, Meldungsliste für Admins
+- Wird jemand entfernt oder abgelehnt, zieht die Gruppe automatisch in einen neuen, geheimen Raum um –
+  das alte Passwort ist danach wertlos
 - Installierbar als App (PWA), funktioniert offline
 
 ## So funktioniert die Verbindung
@@ -35,7 +43,9 @@ Lokal liegen alle Daten in IndexedDB, verschlüsselt mit einem Schlüssel, den n
 - Ist gerade niemand aus der Gruppe online, kommen neue Einträge erst an, wenn sich zwei Geräte gleichzeitig sehen.
 - In seltenen Netzen (manche Firmen-/Mobilfunknetze) klappt WebRTC ohne TURN-Server nicht.
 - Eine 6-stellige PIN schützt vor neugierigen Blicken, nicht vor jemandem, der das Gerät forensisch untersucht.
-- Wer das Gruppenpasswort hat, kann beitreten. Gebt es nur an Leute weiter, denen ihr vertraut.
+- Wer das Gruppenpasswort hat, landet im Wartebereich – kann aber mitlesen, bis ihr ihn ablehnt und damit umzieht.
+- Regeln (Rollen, Abstimmungen) wertet jedes Gerät selbst aus. Wer die App manipuliert, kann sich lokal anders verhalten,
+  aber keine fremden Einträge fälschen und keine anderen Geräte überstimmen.
 
 ## Auf GitHub veröffentlichen
 

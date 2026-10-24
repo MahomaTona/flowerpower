@@ -1,18 +1,27 @@
 // Gemeinsamer Zugriff der Seiten auf Gruppe, Snapshot und eigene Daten.
 import { activeGroup, allStrains, groupsTick, me, pPrivate, personalVersion, profile, type GroupRuntime } from '../lib/app'
-import type { Authored, MemberData, RatingData, SessionData, Snapshot } from '../lib/model'
+import { isMutedAt, type Authored, type MemberData, type RatingData, type SessionData, type Snapshot } from '../lib/model'
 
 const EMPTY: Snapshot = {
   members: new Map(),
   admins: new Set(),
+  approved: new Set(),
+  pending: new Set(),
   banned: new Set(),
   bannedAt: new Map(),
+  muted: new Map(),
+  hidden: new Map(),
   strains: [],
   ratings: [],
   comments: [],
   reactions: [],
   sessions: [],
   rekeys: [],
+  events: [],
+  rsvps: [],
+  brings: [],
+  reports: [],
+  votes: [],
 }
 
 export type ViewRating = Authored<RatingData> & { private?: boolean }
@@ -51,3 +60,19 @@ export function onlineMembers(rt: GroupRuntime | null): Set<string> {
 }
 
 export const openSessions = (sessions: Map<string, Authored<SessionData>>) => [...sessions.values()].filter((s) => s.status === 'open')
+
+/** Darf ich gerade in der Gruppe schreiben? */
+export function myStatus(snap: Snapshot, me: string) {
+  const muted = isMutedAt(snap, me, Date.now())
+  const until = muted ? Math.max(...(snap.muted.get(me) ?? []).filter(([f, u]) => Date.now() >= f && Date.now() <= u).map(([, u]) => u)) : 0
+  return {
+    admin: snap.admins.has(me),
+    pending: snap.pending.has(me),
+    banned: snap.banned.has(me),
+    muted,
+    mutedUntil: until,
+  }
+}
+
+/** Kommende Treffen (ab 6 Std. vor jetzt), abgesagte zuletzt. */
+export const upcomingEvents = (snap: Snapshot) => snap.events.filter((e) => e.start > Date.now() - 6 * 3600e3)

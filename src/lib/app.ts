@@ -30,7 +30,21 @@ import {
   type IdentityData,
   type Signed,
 } from './vault'
-import { GroupModel, ownKey, type RatingData, type RekeyData, type StrainData } from './model'
+import {
+  GroupModel,
+  ownKey,
+  type BringData,
+  type ContentRef,
+  type EventData,
+  type ModData,
+  type RatingData,
+  type RekeyData,
+  type ReportData,
+  type RsvpData,
+  type StrainData,
+  type VoteData,
+  type VoteResult,
+} from './model'
 import { APP_ID, Peering, roomIdFor, type Hello } from './sync'
 import { STARTER_STRAINS } from './strains'
 
@@ -95,7 +109,11 @@ export class GroupRuntime {
   private stopWatch?: () => void
 
   constructor(public entry: GroupEntry) {
-    this.model = new GroupModel(this.doc, () => this.entry.founder)
+    this.model = new GroupModel(
+      this.doc,
+      () => this.entry.founder,
+      () => me.peek()?.id,
+    )
   }
 
   async start(key: CryptoKey) {
@@ -157,8 +175,14 @@ export class GroupRuntime {
     if (!snap.banned.has(m.id) && (!raw || (mine && (mine.name !== p.name || mine.avatar !== p.avatar)))) {
       await this.model.put(m, 'members', m.id, { id: m.id, name: p.name, avatar: p.avatar, signPub: m.signPub, dhPub: m.dhPub, t: Date.now() })
     }
-    // Schlüsselwechsel durch einen Admin?
-    for (const rk of snap.rekeys) {
+    // Angenommene Abstimmung, die ich gestartet habe? Dann den Umzug selbst ausführen.
+    for (const v of snap.votes)
+      if (v.a === m.id && v.kind === 'remove' && v.status === 'passed' && !snap.rekeys.some((r) => r.reason === 'vote:' + v.id) && !this.handledRekeys.has('vote:' + v.id)) {
+        this.handledRekeys.add('vote:' + v.id)
+        void executeVote(this, v)
+      }
+    // Schlüsselwechsel (durch Admin, Ablehnung oder Abstimmung)?
+    for (const rk of [...snap.rekeys].sort((x, y) => x.t - y.t)) {
       const sealed = rk.payloads[m.id]
       if (!sealed || rk.t <= (this.entry.rekeyT ?? 0) || this.handledRekeys.has(rk.id)) continue
       this.handledRekeys.add(rk.id)
@@ -279,20 +303,103 @@ export async function setRole(rt: GroupRuntime, target: string, role: 'admin' | 
 }
 
 /**
- * Admin: Mitglied entfernen. Weil es keinen Server gibt, der jemanden aussperren könnte,
- * bekommen alle verbleibenden Mitglieder neue, für sie persönlich verschlüsselte Zugangsdaten.
+ * Gruppe in einen neuen Raum umziehen lassen. Weil es keinen Server gibt, der jemanden aussperren könnte,
+ * bekommen alle verbleibenden freigegebenen Mitglieder neue, für sie persönlich verschlüsselte Zugangsdaten.
  */
-export async function removeMember(rt: GroupRuntime, target: string) {
+async function relocate(rt: GroupRuntime, target: string, reason: string) {
   const m = me.peek()!
-  const t = Date.now()
-  await rt.model.put(m, 'roles', ownKey(m.id) + randomId(), { target, role: 'ban', t })
   const snap = rt.model.snapshot()
+  if (snap.rekeys.some((r) => r.reason === reason)) return
   const creds = { roomId: 'fp-' + (await sha256hex(randomBytes(32))).slice(0, 40), password: randomPassword(5) }
   const payloads: RekeyData['payloads'] = {}
   for (const mem of snap.members.values())
-    if (mem.id !== target && !snap.banned.has(mem.id)) payloads[mem.id] = await sealTo(mem.dhPub, creds)
+    if (mem.id !== target && !snap.banned.has(mem.id) && (snap.approved.has(mem.id) || mem.id === m.id))
+      payloads[mem.id] = await sealTo(mem.dhPub, creds)
   const id = ownKey(m.id) + randomId()
-  await rt.model.put(m, 'rekeys', id, { id, t: t + 1, payloads })
+  await rt.model.put(m, 'rekeys', id, { id, t: Date.now() + 1, payloads, reason })
+}
+
+/** Admin: Mitglied sofort entfernen. */
+export async function removeMember(rt: GroupRuntime, target: string) {
+  const m = me.peek()!
+  await rt.model.put(m, 'roles', ownKey(m.id) + randomId(), { target, role: 'ban', t: Date.now() })
+  await relocate(rt, target, 'ban:' + target)
+}
+
+/** Beliebiges Mitglied: Wartende Person freigeben. */
+export async function approveMember(rt: GroupRuntime, target: string) {
+  const m = me.peek()!
+  await rt.model.put(m, 'approvals', ownKey(m.id) + target, { target, t: Date.now() })
+}
+
+/** Beliebiges Mitglied: Wartende Person ablehnen – sie verliert mit dem Umzug den Zugang. */
+export async function rejectPending(rt: GroupRuntime, target: string) {
+  const m = me.peek()!
+  await rt.model.put(m, 'roles', ownKey(m.id) + randomId(), { target, role: 'ban', t: Date.now() })
+  await relocate(rt, target, 'ban:' + target)
+}
+
+// ---------- Moderation ----------
+
+export async function moderate(rt: GroupRuntime, d: Omit<ModData, 'id' | 't'>) {
+  const m = me.peek()!
+  const id = ownKey(m.id) + randomId()
+  await rt.model.put(m, 'mod', id, { ...d, id, t: Date.now() })
+}
+
+export async function report(rt: GroupRuntime, ref: ContentRef, reason: string) {
+  const m = me.peek()!
+  const id = ownKey(m.id) + randomId()
+  await rt.model.put(m, 'reports', id, { id, ref, reason, t: Date.now() })
+}
+
+export async function dismissReport(rt: GroupRuntime, r: ReportData & { a: string }) {
+  // Nur eigene Meldungen lassen sich löschen; Admins blenden sie über „erledigt“ lokal aus
+  const m = me.peek()!
+  if (r.a === m.id) await rt.model.put(m, 'reports', r.id, { ...r, deleted: true })
+}
+
+export async function startVote(rt: GroupRuntime, d: Omit<VoteData, 'id' | 't'>) {
+  const m = me.peek()!
+  const id = ownKey(m.id) + randomId()
+  await rt.model.put(m, 'votes', id, { ...d, id, t: Date.now() })
+  await castBallot(rt, id, true)
+  return id
+}
+
+export async function castBallot(rt: GroupRuntime, vote: string, yes: boolean) {
+  const m = me.peek()!
+  await rt.model.put(m, 'ballots', ownKey(m.id) + vote, { vote, yes, t: Date.now() })
+}
+
+/** Angenommene Abstimmung zum Entfernen umsetzen (Umzug). */
+export async function executeVote(rt: GroupRuntime, v: VoteResult) {
+  if (v.kind === 'remove' && v.status === 'passed' && v.target) await relocate(rt, v.target, 'vote:' + v.id)
+}
+
+// ---------- Treffen ----------
+
+export async function saveEvent(rt: GroupRuntime, d: Omit<EventData, 't' | 'id'> & { id?: string }) {
+  const m = me.peek()!
+  const id = d.id ?? ownKey(m.id) + randomId()
+  await rt.model.put(m, 'events', id, { ...d, id, t: Date.now() })
+  return id
+}
+
+export async function rsvp(rt: GroupRuntime, event: string, status: RsvpData['status']) {
+  const m = me.peek()!
+  await rt.model.put(m, 'rsvps', ownKey(m.id) + event, { event, status, t: Date.now() })
+}
+
+export async function addBring(rt: GroupRuntime, event: string, text: string, strainId?: string) {
+  const m = me.peek()!
+  const id = ownKey(m.id) + randomId()
+  await rt.model.put(m, 'brings', id, { id, event, text, strainId, t: Date.now() })
+}
+
+export async function removeBring(rt: GroupRuntime, b: BringData) {
+  const m = me.peek()!
+  await rt.model.put(m, 'brings', b.id, { ...b, deleted: true })
 }
 
 // ---------- Eigene Geräte ----------

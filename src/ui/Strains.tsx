@@ -7,6 +7,7 @@ import { AROMA_GROUPS, AROMAS, EFFECTS, SOURCES, STRAIN_TYPES, TERPENES, opt, op
 import { Art, back, ChipArt, ChipSelect, Empty, go, HeroArt, Icon, MiniStars, PageHead, pct, route, Score, Seg, SingleSelect, Skeleton, Slider, TerpDots, toast } from './kit'
 import { TERP_COLORS, strainPalette } from '../lib/art'
 import { RatingCard } from './Feed'
+import { ContentMenu } from './Moderation'
 import { Radar, SERIES_COLORS } from './Radar'
 import { memberOf, useData, type ViewRating } from './data'
 
@@ -205,6 +206,7 @@ export function StrainDetail({ id }: { id: string }) {
             <Icon name="back" />
           </button>
           <div class="row">
+            {s.origin === 'group' && d.rt && <ContentMenu rt={d.rt} snap={d.snap} refv={{ map: 'strains', id }} author={s.a!} glass />}
             {canEdit && (
               <button class="glassbtn" aria-label="Sorte bearbeiten" onClick={() => go(`/strain-new?edit=${encodeURIComponent(id)}`)}>
                 <Icon name="edit" />

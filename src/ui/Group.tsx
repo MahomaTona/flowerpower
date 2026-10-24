@@ -10,16 +10,15 @@ import {
   leaveGroup,
   me as meSig,
   parseInvite,
-  removeMember,
   setActiveGroup,
-  setRole,
   type GroupRuntime,
 } from '../lib/app'
 import { randomPassword } from '../lib/crypto'
 import { pendingInvite } from '../lib/prefs'
 import { confetti } from '../lib/confetti'
-import { Avatar, Copy, PageHead, QR, Seg, Sheet, ShareBtn, go, route, toast } from './kit'
-import { onlineMembers, useData } from './data'
+import { Avatar, Copy, go, Icon, PageHead, QR, route, Seg, ShareBtn, Sheet, toast } from './kit'
+import { myStatus, onlineMembers, useData } from './data'
+import { MemberActions, ModerationPanel } from './Moderation'
 
 export function GroupPage() {
   groupsTick.value
@@ -135,22 +134,32 @@ function GroupDetail({ rt }: { rt: GroupRuntime }) {
   const d = useData()
   const me = meSig.value!
   const [invite, setInvite] = useState(false)
+  const [actionsFor, setActionsFor] = useState<string | null>(null)
   const snap = d.snap
-  const isAdmin = snap.admins.has(me.id)
+  const st = myStatus(snap, me.id)
+  const activeCount = [...snap.members.keys()].filter((id) => snap.approved.has(id) && !snap.banned.has(id)).length
   const online = onlineMembers(rt)
   const peers = Object.keys(rt.peering?.peers.value ?? {}).length
   const err = rt.peering?.error.value
   const banned = snap.banned.has(me.id)
-  const members = [...snap.members.values()].sort((a, b) => Number(online.has(b.id)) - Number(online.has(a.id)) || a.name.localeCompare(b.name))
+  const members = [...snap.members.values()].filter((m) => !snap.pending.has(m.id)).sort((a, b) => Number(online.has(b.id)) - Number(online.has(a.id)) || a.name.localeCompare(b.name))
   return (
     <>
-      {banned && <div class="banner warn mb">Ein Admin hat dich aus dieser Gruppe entfernt. Du siehst nur noch den alten Stand.</div>}
+      {banned && <div class="banner warn mb">Du wurdest aus dieser Gruppe entfernt. Du siehst nur noch den alten Stand.</div>}
+      {st.pending && !banned && (
+        <div class="banner mb">⏳ Du wartest auf Freigabe. Sobald jemand aus der Gruppe dich bestätigt, sehen die anderen deine Beiträge.</div>
+      )}
+      {st.muted && (
+        <div class="banner warn mb">
+          🔇 Du bist {Number.isFinite(st.mutedUntil) ? `bis ${new Date(st.mutedUntil).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' })}` : 'bis auf Weiteres'} stummgeschaltet.
+        </div>
+      )}
       <div class="card">
         <div class="row between">
           <div>
             <h2 style={{ margin: 0 }}>{rt.entry.name}</h2>
             <div class="small muted">
-              {snap.members.size} Mitglied{snap.members.size === 1 ? '' : 'er'} · {peers ? `${peers} Gerät${peers === 1 ? '' : 'e'} verbunden` : 'gerade niemand online'}
+              {activeCount} Mitglied{activeCount === 1 ? '' : 'er'} · {peers ? `${peers} Gerät${peers === 1 ? '' : 'e'} verbunden` : 'gerade niemand online'}
             </div>
           </div>
           <span class={'online' + (peers ? ' on' : '')}>
@@ -170,24 +179,40 @@ function GroupDetail({ rt }: { rt: GroupRuntime }) {
         <div class="card">
           {members.length === 0 && <p class="muted small">Noch keine Mitglieder sichtbar – warte, bis sich jemand verbindet.</p>}
           {members.map((m) => {
-            const role = m.id === snap.founder ? 'Gründer' : snap.admins.has(m.id) ? 'Admin' : snap.banned.has(m.id) ? 'Entfernt' : ''
+            const ms = myStatus(snap, m.id)
+            const role = m.id === snap.founder ? '👑 Gründer' : snap.admins.has(m.id) ? '⭐ Admin' : snap.banned.has(m.id) ? 'Entfernt' : 'Mitglied'
+            const canAct = m.id !== me.id && !snap.banned.has(m.id) && !st.banned && !st.pending
             return (
-              <div class="row" style={{ padding: '6px 0', opacity: snap.banned.has(m.id) ? 0.5 : 1 }}>
+              <button
+                class="member-row"
+                disabled={!canAct}
+                onClick={() => canAct && setActionsFor(m.id)}
+                style={{ opacity: snap.banned.has(m.id) ? 0.5 : 1 }}
+              >
                 <Avatar emoji={m.avatar} online={online.has(m.id) || m.id === me.id} />
                 <div class="grow">
                   <b>{m.name}</b> {m.id === me.id && <span class="muted small">(du)</span>}
-                  <div class="tiny muted">{role || 'Mitglied'}</div>
+                  <div class="tiny muted">
+                    {role}
+                    {ms.muted && ' · 🔇 stumm'}
+                  </div>
                 </div>
-                {isAdmin && m.id !== me.id && m.id !== snap.founder && !snap.banned.has(m.id) && <MemberMenu rt={rt} id={m.id} name={m.name} admin={snap.admins.has(m.id)} />}
-              </div>
+                {canAct && <Icon name="more" />}
+              </button>
             )
           })}
         </div>
         <p class="tiny muted">
-          Jeder Eintrag ist mit dem Schlüssel seines Autors signiert. Entfernt ein Admin jemanden, bekommen alle anderen automatisch neue Zugangsdaten – die
-          entfernte Person bleibt im alten Raum zurück.
+          Tippe auf ein Mitglied für Aktionen. Admins können sofort handeln, alle anderen können eine Abstimmung starten. Wird jemand entfernt, bekommen alle
+          anderen automatisch neue Zugangsdaten – das alte Passwort ist danach wertlos.
         </p>
       </div>
+
+      <ModerationPanel rt={rt} snap={snap} strainName={(id) => d.strainMap.get(id)?.name} />
+
+      <Sheet open={!!actionsFor} onClose={() => setActionsFor(null)}>
+        {actionsFor && <MemberActions rt={rt} snap={snap} id={actionsFor} onClose={() => setActionsFor(null)} />}
+      </Sheet>
 
       <div class="section">
         <button
@@ -225,46 +250,6 @@ function GroupDetail({ rt }: { rt: GroupRuntime }) {
         <button class="btn block mt" onClick={() => setInvite(false)}>
           Fertig
         </button>
-      </Sheet>
-    </>
-  )
-}
-
-function MemberMenu({ rt, id, name, admin }: { rt: GroupRuntime; id: string; name: string; admin: boolean }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <>
-      <button class="btn sm ghost" onClick={() => setOpen(true)} aria-label={`Optionen für ${name}`}>
-        ⋯
-      </button>
-      <Sheet open={open} onClose={() => setOpen(false)}>
-        <h2>{name}</h2>
-        <div class="stack">
-          <button
-            class="btn"
-            onClick={async () => {
-              await setRole(rt, id, admin ? 'member' : 'admin')
-              toast(admin ? 'Admin-Rechte entzogen' : `${name} ist jetzt Admin`)
-              setOpen(false)
-            }}
-          >
-            {admin ? 'Admin-Rechte entziehen' : 'Zum Admin machen'}
-          </button>
-          <button
-            class="btn danger"
-            onClick={async () => {
-              if (!confirm(`${name} wirklich entfernen? Alle anderen bekommen neue Zugangsdaten.`)) return
-              await removeMember(rt, id)
-              toast(`${name} entfernt – Gruppe zieht in einen neuen Raum um`)
-              setOpen(false)
-            }}
-          >
-            Aus Gruppe entfernen
-          </button>
-          <button class="btn ghost" onClick={() => setOpen(false)}>
-            Abbrechen
-          </button>
-        </div>
       </Sheet>
     </>
   )

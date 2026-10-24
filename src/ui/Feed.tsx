@@ -9,7 +9,9 @@ import { discreet } from '../lib/prefs'
 import { STARTER_STRAINS } from '../lib/strains'
 import { ALL_EFFECTS, AROMAS, FORMS, REACTIONS, SOURCES, STRAIN_TYPES, opt, optLabel } from '../lib/taxonomy'
 import { Art, Avatar, Empty, Icon, MiniStars, Score, Skeleton, TerpDots, fmtDate, go, timeAgo, toast } from './kit'
-import { memberOf, onlineMembers, openSessions, useData, type ViewRating } from './data'
+import { memberOf, myStatus, onlineMembers, openSessions, upcomingEvents, useData, type ViewRating } from './data'
+import { EventCard } from './Events'
+import { ContentMenu, HiddenNote, attentionCount } from './Moderation'
 
 function greeting() {
   const h = new Date().getHours()
@@ -74,10 +76,26 @@ export function Feed() {
   const spotlight = pickSpotlight(weekRatings.length ? weekRatings : d.group, d.strainMap, weekRatings.length > 0)
   const members = [...d.snap.members.values()].filter((m) => !d.snap.banned.has(m.id))
   const tried = new Set(d.group.map((r) => r.strainId)).size
+  const st = myStatus(d.snap, d.me.id)
+  const attention = attentionCount(d.snap, d.me.id)
+  const nextEvents = d.rt ? upcomingEvents(d.snap).filter((e) => e.status === 'planned').slice(0, 2) : []
 
   return (
     <div class="content">
       {head}
+
+      {st.pending && <div class="banner mb">⏳ Du wartest auf Freigabe – deine Beiträge sehen die anderen, sobald dich jemand bestätigt.</div>}
+      {st.muted && <div class="banner warn mb">🔇 Du bist gerade stummgeschaltet und kannst in der Gruppe nichts schreiben.</div>}
+      {attention > 0 && (
+        <a class="banner mb" href="#/group" style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
+          🛡️ {attention} {attention === 1 ? 'Punkt wartet' : 'Punkte warten'} auf dich (Freigaben, Abstimmungen oder Meldungen) →
+        </a>
+      )}
+      {nextEvents.map((ev) => (
+        <div class="mb">
+          <EventCard ev={ev} rt={d.rt!} snap={d.snap} compact />
+        </div>
+      ))}
 
       {live.map((s) => {
         const st = d.strainMap.get(s.strainId)
@@ -267,6 +285,7 @@ export function RatingCard({ r, rt, snap, strain }: { r: ViewRating; rt: GroupRu
         </div>
         <Score value={r.overall} />
       </div>
+      {!r.private && <HiddenNote snap={snap} refv={{ map: 'ratings', id: r.id }} />}
       {photoBytes && <img class="photo" src={photoUrl(photoBytes)} alt={`Foto von ${strain?.name ?? 'der Sorte'}`} loading="lazy" />}
       {(aromas.length > 0 || effects.length > 0) && (
         <div class="chips" style={{ marginTop: photoBytes ? '0.75rem' : 0 }}>
@@ -308,7 +327,7 @@ export function RatingCard({ r, rt, snap, strain }: { r: ViewRating; rt: GroupRu
         </div>
       )}
       <div class="foot">
-        {!r.private && rt ? <Reactions r={r} rt={rt} snap={snap} /> : <MiniStars value={r.overall} />}
+        {!r.private && rt && !myStatus(snap, me.id).muted ? <Reactions r={r} rt={rt} snap={snap} /> : <MiniStars value={r.overall} />}
         <div class="row" style={{ gap: 2 }}>
           {!r.private && rt && (
             <button class={'iconbtn' + (talk ? ' on' : '')} aria-label="Kommentieren" aria-expanded={talk} onClick={() => setTalk(!talk)}>
@@ -326,6 +345,7 @@ export function RatingCard({ r, rt, snap, strain }: { r: ViewRating; rt: GroupRu
               <Icon name="edit" />
             </button>
           )}
+          {!r.private && rt && <ContentMenu rt={rt} snap={snap} refv={{ map: 'ratings', id: r.id }} author={r.a} />}
         </div>
       </div>
       {!r.private && rt && (nComments > 0 || talk) && <Comments r={r} rt={rt} snap={snap} input={talk} />}
@@ -406,6 +426,7 @@ function Comments({ r, rt, snap, input }: { r: ViewRating; rt: GroupRuntime; sna
               <b>{m.name}</b> <span class="tiny muted">{timeAgo(c.t)}</span>
               <div>{c.text}</div>
             </div>
+            {c.a !== me.id && <ContentMenu rt={rt} snap={snap} refv={{ map: 'comments', id: c.id }} author={c.a} />}
             {c.a === me.id && (
               <button
                 class="iconbtn"
@@ -419,7 +440,7 @@ function Comments({ r, rt, snap, input }: { r: ViewRating; rt: GroupRuntime; sna
           </div>
         )
       })}
-      {input && (
+      {input && !myStatus(snap, me.id).muted && (
       <form
         class="row"
         style={{ marginTop: '0.7rem', animation: 'rise .3s ease both' }}
