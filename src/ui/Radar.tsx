@@ -22,7 +22,16 @@ export function Radar({ axes, series, size = 300 }: { axes: { id: string; label:
           return <line x1={c} y1={c} x2={x} y2={y} stroke="var(--line)" stroke-width="1" />
         })}
         {series.map((s) => (
-          <polygon points={poly(axes.map((a) => s.values[a.id] ?? 0))} fill={s.color} fill-opacity="0.18" stroke={s.color} stroke-width="2" stroke-linejoin="round" />
+          <polygon
+            class="series"
+            style={{ transformOrigin: `${c}px ${c}px` }}
+            points={poly(axes.map((a) => s.values[a.id] ?? 0))}
+            fill={s.color}
+            fill-opacity="0.22"
+            stroke={s.color}
+            stroke-width="2"
+            stroke-linejoin="round"
+          />
         ))}
         {axes.map((a, i) => {
           const [x, y] = pt(i, 1.17)

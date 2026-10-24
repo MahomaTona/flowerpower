@@ -4,7 +4,8 @@ import { randomId } from '../lib/crypto'
 import { ownKey, type StrainData } from '../lib/model'
 import { byStrain, statsFor, type R, type StrainStats } from '../lib/insights'
 import { AROMA_GROUPS, AROMAS, EFFECTS, SOURCES, STRAIN_TYPES, TERPENES, opt, optLabel } from '../lib/taxonomy'
-import { ChipSelect, Empty, Icon, MiniStars, PageHead, Seg, SingleSelect, Slider, go, pct, route, strainIcon, toast } from './kit'
+import { Art, back, ChipArt, ChipSelect, Empty, go, HeroArt, Icon, MiniStars, PageHead, pct, route, Score, Seg, SingleSelect, Skeleton, Slider, TerpDots, toast } from './kit'
+import { TERP_COLORS, strainPalette } from '../lib/art'
 import { RatingCard } from './Feed'
 import { Radar, SERIES_COLORS } from './Radar'
 import { memberOf, useData, type ViewRating } from './data'
@@ -32,22 +33,24 @@ export function StrainList() {
   )
   if (sort === 'top') list = [...list].sort((a, b) => (stats.get(b.id)?.avg ?? 0) - (stats.get(a.id)?.avg ?? 0))
   if (sort === 'oft') list = [...list].sort((a, b) => (stats.get(b.id)?.n ?? 0) - (stats.get(a.id)?.n ?? 0))
+  const activeFilters = types.length + terps.length
   return (
-    <div class="content">
-      <PageHead
-        title="Sorten"
-        right={
-          <button class="btn sm" onClick={() => go('/strain-new')}>
-            + Neue Sorte
-          </button>
-        }
-      />
+    <div class="content wide">
+      <div class="section-head">
+        <div>
+          <span class="eyebrow">Die Sammlung</span>
+          <h1 style={{ margin: '0.15rem 0 0' }}>Sorten</h1>
+        </div>
+        <button class="btn sm" onClick={() => go('/strain-new')}>
+          <Icon name="plus" /> Neue Sorte
+        </button>
+      </div>
       <div class="tabs">
         {(
           [
-            ['alle', `Alle (${d.strains.length})`],
-            ['merkliste', `♡ Merkliste (${pWishlist.size})`],
-            ['probiert', `Probiert (${tried.size})`],
+            ['alle', `Alle · ${d.strains.length}`],
+            ['merkliste', `♥ Merkliste · ${pWishlist.size}`],
+            ['probiert', `Probiert · ${tried.size}`],
           ] as [Tab, string][]
         ).map(([t, l]) => (
           <button class={'chip' + (tab === t ? ' on' : '')} onClick={() => setTab(t)}>
@@ -60,12 +63,12 @@ export function StrainList() {
           <Icon name="search" />
           <input class="input" type="search" placeholder="Sorte oder Genetik suchen" value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
         </div>
-        <button class={'btn' + (types.length || terps.length ? ' primary' : '')} onClick={() => setShowFilter(!showFilter)}>
-          Filter
+        <button class={'btn' + (activeFilters ? ' primary' : '')} onClick={() => setShowFilter(!showFilter)} aria-expanded={showFilter}>
+          Filter{activeFilters ? ` · ${activeFilters}` : ''}
         </button>
       </div>
       {showFilter && (
-        <div class="card flat mb">
+        <div class="card flat mb" style={{ animation: 'rise .35s ease both' }}>
           <div class="chipgroup-label" style={{ marginTop: 0 }}>
             Typ
           </div>
@@ -89,16 +92,16 @@ export function StrainList() {
           {tab === 'merkliste' ? 'Tippe bei einer Sorte auf ♡, um sie dir zu merken.' : 'Keine Sorte gefunden.'}
           {ql && (
             <div class="mt">
-              <button class="btn" onClick={() => go(`/strain-new?name=${encodeURIComponent(q.trim())}`)}>
+              <button class="btn primary" onClick={() => go(`/strain-new?name=${encodeURIComponent(q.trim())}`)}>
                 „{q.trim()}“ anlegen
               </button>
             </div>
           )}
         </Empty>
       ) : (
-        <div class="list">
-          {list.map((s) => (
-            <StrainRow s={s} st={stats.get(s.id)} />
+        <div class="gallery">
+          {list.map((s, i) => (
+            <StrainCard key={s.id} s={s} st={stats.get(s.id)} i={i} />
           ))}
         </div>
       )}
@@ -106,42 +109,39 @@ export function StrainList() {
   )
 }
 
-function StrainRow({ s, st }: { s: StrainData & { origin: string }; st?: StrainStats }) {
+function StrainCard({ s, st, i }: { s: StrainData & { origin: string }; st?: StrainStats; i: number }) {
   const wish = pWishlist.has(s.id)
   return (
-    <a class="card link strain-row" href={`#/strain/${encodeURIComponent(s.id)}`}>
-      <span class="strain-ico">{strainIcon(s.type)}</span>
-      <div class="grow">
-        <div class="row" style={{ gap: 6 }}>
-          <b>{s.name}</b>
-          {s.origin === 'private' && <span class="badge gray">privat</span>}
-          {s.origin === 'group' && <span class="badge">Gruppe</span>}
-        </div>
-        <div class="tiny muted">
-          {optLabel(STRAIN_TYPES, s.type)} · THC {pct(s.thc)} · {s.terpenes.slice(0, 2).map((t) => optLabel(TERPENES, t)).join(', ')}
+    <a class="gcard" href={`#/strain/${encodeURIComponent(s.id)}`} style={{ '--i': i }}>
+      <div class="art-wrap">
+        <Art s={s} alt="" />
+        {s.origin !== 'start' && <span class="badge tag">{s.origin === 'private' ? '🙈 privat' : '👥 Gruppe'}</span>}
+        <button
+          class={'heart' + (wish ? ' on' : '')}
+          key={wish ? 'on' : 'off'}
+          aria-label={wish ? 'Von Merkliste entfernen' : 'Auf die Merkliste'}
+          onClick={(e) => {
+            e.preventDefault()
+            toggleWish(s.id)
+          }}
+        >
+          {wish ? '♥' : '♡'}
+        </button>
+        <div class="over">
+          <div class="name">{s.name}</div>
+          <div class="type">{optLabel(STRAIN_TYPES, s.type)}</div>
         </div>
       </div>
-      <div style={{ textAlign: 'right' }}>
+      <div class="meta">
+        <TerpDots s={s} />
         {st ? (
-          <>
-            <MiniStars value={st.avg} />
-            <div class="tiny muted">{st.n}×</div>
-          </>
+          <span class="row" style={{ gap: 4 }}>
+            <MiniStars value={st.avg} /> <span class="muted">{st.n}</span>
+          </span>
         ) : (
-          <span class="tiny muted">neu</span>
+          <span class="muted">THC {pct(s.thc)}</span>
         )}
       </div>
-      <button
-        class="iconbtn"
-        aria-label={wish ? 'Von Merkliste entfernen' : 'Auf die Merkliste'}
-        style={{ color: wish ? 'var(--accent)' : undefined }}
-        onClick={(e) => {
-          e.preventDefault()
-          toggleWish(s.id)
-        }}
-      >
-        {wish ? '♥' : '♡'}
-      </button>
     </a>
   )
 }
@@ -150,7 +150,7 @@ export function toggleWish(id: string) {
   if (pWishlist.has(id)) pWishlist.delete(id)
   else {
     pWishlist.set(id, Date.now())
-    toast('Auf der Merkliste')
+    toast('♥ Auf der Merkliste')
   }
 }
 
@@ -177,7 +177,8 @@ export function StrainDetail({ id }: { id: string }) {
     return (
       <div class="content">
         <PageHead title="Sorte" backTo />
-        <Empty icon="🌫️">Diese Sorte gibt es (noch) nicht – vielleicht synchronisiert sie gerade.</Empty>
+        <p class="muted small">Diese Sorte ist (noch) nicht da – vielleicht synchronisiert sie gerade.</p>
+        <Skeleton rows={1} />
       </div>
     )
   const ratings: ViewRating[] = [...d.group, ...d.priv].filter((r) => r.strainId === id).sort((a, b) => b.t - a.t)
@@ -194,55 +195,80 @@ export function StrainDetail({ id }: { id: string }) {
       const k = `${r.source ?? ''}|${r.batch ?? ''}`
       batches.set(k, [...(batches.get(k) ?? []), r])
     }
+  const pal = strainPalette(s)
   return (
     <div class="content">
-      <PageHead
-        title={s.name}
-        backTo
-        right={
-          <button class="iconbtn" style={{ color: wish ? 'var(--accent)' : undefined, fontSize: '1.4rem' }} aria-label="Merkliste" onClick={() => toggleWish(id)}>
-            {wish ? '♥' : '♡'}
+      <div class="hero">
+        <HeroArt s={s} />
+        <div class="hero-top">
+          <button class="glassbtn" aria-label="Zurück" onClick={back}>
+            <Icon name="back" />
           </button>
-        }
-      />
-      <div class="card">
-        <div class="row mb">
-          <span class="strain-ico">{strainIcon(s.type)}</span>
-          <div class="grow">
-            <b>{optLabel(STRAIN_TYPES, s.type)}</b>
-            {s.lineage && <div class="small muted">{s.lineage}</div>}
+          <div class="row">
+            {canEdit && (
+              <button class="glassbtn" aria-label="Sorte bearbeiten" onClick={() => go(`/strain-new?edit=${encodeURIComponent(id)}`)}>
+                <Icon name="edit" />
+              </button>
+            )}
+            <button class={'glassbtn' + (wish ? ' on' : '')} key={wish ? 'on' : 'off'} aria-label="Merkliste" onClick={() => toggleWish(id)}>
+              {wish ? '♥' : '♡'}
+            </button>
           </div>
-          {st.n > 0 && (
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '1.5rem', fontFamily: 'var(--font-head)' }}>{st.avg.toFixed(1)}</div>
-              <div class="tiny muted">{st.n} Bewertung{st.n === 1 ? '' : 'en'}</div>
-            </div>
-          )}
         </div>
-        <dl class="kv">
-          <dt>THC</dt>
-          <dd>{pct(s.thc)}</dd>
-          <dt>CBD</dt>
-          <dd>{pct(s.cbd)}</dd>
-          {s.breeder && (
-            <>
-              <dt>Züchter</dt>
-              <dd>{s.breeder}</dd>
-            </>
-          )}
-        </dl>
-        <div class="chipgroup-label">Terpene</div>
-        <div class="stack" style={{ gap: 6 }}>
+        <div class="hero-text">
+          <span class="eyebrow">{optLabel(STRAIN_TYPES, s.type)}</span>
+          <h1>{s.name}</h1>
+          {s.lineage && <div class="sub">{s.lineage}</div>}
+        </div>
+        {st.n > 0 && (
+          <div class="hero-score">
+            <Score value={st.avg} />
+            <div class="tiny" style={{ opacity: 0.75 }}>
+              {st.n} Bewertung{st.n === 1 ? '' : 'en'}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div class="row mb">
+        <button class="btn primary grow" onClick={() => go(`/rate?strain=${encodeURIComponent(id)}`)}>
+          <Icon name="plus" /> Bewerten
+        </button>
+        {d.rt && (
+          <button class="btn" onClick={() => go(`/sessions?strain=${encodeURIComponent(id)}`)}>
+            🍷 Tasting
+          </button>
+        )}
+      </div>
+
+      <div class="card">
+        <div class="stat-tiles">
+          <div class="stat">
+            <span class="num">{pct(s.thc).replace(' %', '')}</span>
+            <span class="lbl">THC %</span>
+          </div>
+          <div class="stat">
+            <span class="num">{pct(s.cbd).replace(' %', '')}</span>
+            <span class="lbl">CBD %</span>
+          </div>
+          <div class="stat">
+            <span class="num">{st.raters.size || '–'}</span>
+            <span class="lbl">probiert</span>
+          </div>
+        </div>
+        <div class="chipgroup-label">Terpenprofil</div>
+        <div class="stack" style={{ gap: 10 }}>
           {s.terpenes.map((t, i) => {
             const o = opt(TERPENES, t)
+            const c = TERP_COLORS[t]
             return (
               <div>
-                <div class="row between small">
+                <div class="row between small" style={{ marginBottom: 4 }}>
                   <b>{o?.label ?? t}</b>
                   <span class="muted tiny">{o?.hint}</span>
                 </div>
                 <div class="bar">
-                  <i style={{ width: `${100 - i * 25}%` }} />
+                  <i style={{ width: `${100 - i * 25}%`, background: c ? `linear-gradient(90deg, ${c[0]}, ${c[1]})` : undefined, animationDelay: `${i * 120}ms` }} />
                 </div>
               </div>
             )
@@ -263,27 +289,20 @@ export function StrainDetail({ id }: { id: string }) {
             </div>
           </>
         )}
-        {s.origin === 'start' && <p class="tiny muted mt" style={{ marginBottom: 0 }}>Richtwerte aus der Startliste – echte Werte schwanken je Charge.</p>}
-        <div class="row mt">
-          <button class="btn primary grow" onClick={() => go(`/rate?strain=${encodeURIComponent(id)}`)}>
-            Bewerten
-          </button>
-          {d.rt && (
-            <button class="btn" onClick={() => go(`/sessions?strain=${encodeURIComponent(id)}`)}>
-              🍷 Tasting starten
-            </button>
-          )}
-          {canEdit && (
-            <button class="btn" onClick={() => go(`/strain-new?edit=${encodeURIComponent(id)}`)} aria-label="Sorte bearbeiten">
-              <Icon name="edit" />
-            </button>
-          )}
-        </div>
+        {s.breeder && <p class="small muted mt" style={{ marginBottom: 0 }}>Züchter: {s.breeder}</p>}
+        {s.origin === 'start' && (
+          <p class="tiny muted mt" style={{ marginBottom: 0 }}>
+            Richtwerte aus der Startliste – echte Werte schwanken je Charge.
+          </p>
+        )}
       </div>
 
       {st.n > 0 && (
         <div class="section">
-          <h3>Profil der Gruppe</h3>
+          <div class="section-head">
+            <h3>Profil der Gruppe</h3>
+            <CompareLink id={id} />
+          </div>
           <div class="card">
             <Seg
               value={view}
@@ -294,9 +313,9 @@ export function StrainDetail({ id }: { id: string }) {
                 ['vergleich', 'Pro Person'],
               ]}
             />
-            <div class="mt">
-              {view === 'aroma' && <Radar axes={aromaAxes()} series={[{ label: 'Gruppe', values: aromaValues(st), color: 'var(--accent)' }]} />}
-              {view === 'wirkung' && <Radar axes={effectAxes()} series={[{ label: 'Gruppe', values: effectValues(st), color: 'var(--accent)' }]} />}
+            <div class="mt" key={view}>
+              {view === 'aroma' && <Radar axes={aromaAxes()} series={[{ label: 'Gruppe', values: aromaValues(st), color: pal[0][1] }]} />}
+              {view === 'wirkung' && <Radar axes={effectAxes()} series={[{ label: 'Gruppe', values: effectValues(st), color: pal[1][1] }]} />}
               {view === 'vergleich' && (
                 <Radar
                   axes={effectAxes()}
@@ -315,12 +334,11 @@ export function StrainDetail({ id }: { id: string }) {
                 const avg = rs.reduce((x, r) => x + r.overall, 0) / rs.length
                 return (
                   <span class="chip static">
-                    {m.avatar} {m.name} · {avg.toFixed(1)}★
+                    {m.avatar} {m.name} · {avg.toFixed(1)} ★
                   </span>
                 )
               })}
             </div>
-            <CompareLink id={id} />
           </div>
         </div>
       )}
@@ -333,9 +351,9 @@ export function StrainDetail({ id }: { id: string }) {
               const [src, batch] = k.split('|')
               const avg = rs.reduce((x, r) => x + r.overall, 0) / rs.length
               return (
-                <div class="row between small" style={{ padding: '4px 0' }}>
+                <div class="row between small" style={{ padding: '6px 0' }}>
                   <span>
-                    {src ? optLabel(SOURCES, src) : 'Unbekannte Quelle'}
+                    {src ? `${opt(SOURCES, src)?.icon ?? ''} ${optLabel(SOURCES, src)}` : 'Unbekannte Quelle'}
                     {batch && <span class="muted"> · {batch}</span>}
                   </span>
                   <span>
@@ -349,13 +367,15 @@ export function StrainDetail({ id }: { id: string }) {
       )}
 
       <div class="section">
-        <h3>Bewertungen</h3>
+        <h3>Notizen</h3>
         {ratings.length === 0 ? (
-          <Empty icon="📝">Noch niemand hat diese Sorte bewertet.</Empty>
+          <Empty icon="📝">Noch niemand hat diese Sorte bewertet. Sei die erste Stimme!</Empty>
         ) : (
           <div class="list">
-            {ratings.map((r) => (
-              <RatingCard r={r} rt={d.rt} snap={d.snap} compact />
+            {ratings.map((r, i) => (
+              <div style={{ '--i': i }} key={r.id}>
+                <RatingCard r={r} rt={d.rt} snap={d.snap} strain={s} />
+              </div>
             ))}
           </div>
         )}
@@ -367,8 +387,8 @@ export function StrainDetail({ id }: { id: string }) {
 
 function CompareLink({ id }: { id: string }) {
   return (
-    <button class="btn sm mt" onClick={() => go(`/compare?ids=${encodeURIComponent(id)}`)}>
-      Mit anderen Sorten vergleichen
+    <button class="btn sm ghost" onClick={() => go(`/compare?ids=${encodeURIComponent(id)}`)}>
+      Vergleichen →
     </button>
   )
 }
@@ -432,7 +452,7 @@ export function Compare() {
           <div class="chips">
             {candidates.slice(0, 30).map((s) => (
               <button class="chip" onClick={() => setIds([...ids, s.id])}>
-                {strainIcon(s.type)} {s.name}
+                <ChipArt s={s} /> {s.name}
               </button>
             ))}
             {!candidates.length && <span class="muted small">Keine weiteren bewerteten Sorten.</span>}

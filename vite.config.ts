@@ -12,7 +12,8 @@ export default defineConfig({
       injectRegister: false,
       manifest: false, // eigene Manifeste in public/ (normal + diskret)
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,webmanifest}'],
+        // Schriften nur in lateinischen Zeichensätzen vorhalten, der Rest bleibt online
+        globPatterns: ['**/*.{js,css,html,svg,png,webmanifest}', '**/*-latin-*.woff2'],
         navigateFallback: 'index.html',
       },
     }),

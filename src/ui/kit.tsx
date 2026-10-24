@@ -4,6 +4,7 @@ import type { ComponentChildren } from 'preact'
 import { useEffect, useRef, useState } from 'preact/hooks'
 import QRCode from 'qrcode'
 import type { Opt } from '../lib/taxonomy'
+import { strainArtUrl, strainPalette } from '../lib/art'
 
 // ---------- Router ----------
 
@@ -50,6 +51,7 @@ const paths: Record<string, string> = {
   share: 'M4 12v7h16v-7M12 3v12M7 8l5-5 5 5',
   edit: 'M4 20h4L19 9l-4-4L4 16zM14 6l4 4',
   close: 'M6 6l12 12M18 6L6 18',
+  chat: 'M4 5h16v11H9l-5 4z',
 }
 export const Icon = ({ name, class: cls }: { name: string; class?: string }) => (
   <svg class={'ico ' + (cls ?? '')} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -59,14 +61,88 @@ export const Icon = ({ name, class: cls }: { name: string; class?: string }) => 
 
 export const Logo = ({ class: cls = 'logo' }: { class?: string }) => (
   <svg class={cls} viewBox="0 0 64 64" aria-hidden="true">
-    <g fill="var(--accent)" transform="translate(32 32)">
+    <g fill="var(--accent)" fill-opacity=".9" transform="translate(32 32)">
       {[0, 60, 120, 180, 240, 300].map((r) => (
-        <ellipse rx="7" ry="14" cy="-11" transform={`rotate(${r})`} />
+        <path d="M0 0 C -8 -6 -7 -20 0 -26 C 7 -20 8 -6 0 0 Z" transform={`rotate(${r})`} />
       ))}
     </g>
-    <circle cx="32" cy="32" r="7" fill="var(--accent-2)" />
+    <circle cx="32" cy="32" r="6.5" fill="var(--accent-2)" />
   </svg>
 )
+
+const petalPath = (len: number, w: number) => `M0 0 C ${-w} ${-len * 0.3} ${-w * 0.7} ${-len * 0.82} 0 ${-len} C ${w * 0.7} ${-len * 0.82} ${w} ${-len * 0.3} 0 0 Z`
+
+/** Animiertes Logo: Blüte entfaltet sich, atmet und leuchtet. */
+export function BloomLogo({ class: cls = 'hero-logo' }: { class?: string }) {
+  return (
+    <svg class={'bloom ' + cls} viewBox="0 0 100 100" aria-hidden="true">
+      <defs>
+        <radialGradient id="bl-halo">
+          <stop offset="0" stop-color="var(--accent)" stop-opacity=".6" />
+          <stop offset="1" stop-color="var(--accent)" stop-opacity="0" />
+        </radialGradient>
+        <linearGradient id="bl-a" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0" stop-color="var(--accent)" />
+          <stop offset="1" stop-color="var(--accent)" stop-opacity=".35" />
+        </linearGradient>
+        <linearGradient id="bl-b" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0" stop-color="var(--accent-2)" />
+          <stop offset="1" stop-color="var(--accent-2)" stop-opacity=".45" />
+        </linearGradient>
+      </defs>
+      <circle class="halo" cx="50" cy="50" r="50" fill="url(#bl-halo)" />
+      <g class="breathe">
+        <g class="spin">
+          <g transform="translate(50 50)">
+            {Array.from({ length: 8 }, (_, i) => (
+              <g transform={`rotate(${i * 45 + 22.5})`}>
+                <path class="petal" style={{ '--i': i }} d={petalPath(40, 13)} fill="url(#bl-a)" />
+              </g>
+            ))}
+            <g class="ring2">
+              {Array.from({ length: 6 }, (_, i) => (
+                <g transform={`rotate(${i * 60})`}>
+                  <path class="petal" style={{ '--i': i }} d={petalPath(26, 11)} fill="url(#bl-b)" />
+                </g>
+              ))}
+            </g>
+          </g>
+        </g>
+        <circle class="core" cx="50" cy="50" r="8" fill="var(--accent)" />
+        <circle class="core" cx="50" cy="50" r="4" fill="var(--bg)" opacity=".5" />
+      </g>
+    </svg>
+  )
+}
+
+/** Lebender Hintergrund aus wabernden Farbwolken. */
+export const Aurora = () => (
+  <div class="aurora" aria-hidden="true">
+    <i />
+    <i />
+    <i />
+  </div>
+)
+
+export function Skeleton({ rows = 2 }: { rows?: number }) {
+  return (
+    <div class="list">
+      {Array.from({ length: rows }, (_, i) => (
+        <div class="card" style={{ '--i': i }}>
+          <div class="row">
+            <div class="skel skel-box" />
+            <div class="grow">
+              <div class="skel skel-line" style={{ width: '55%' }} />
+              <div class="skel skel-line" style={{ width: '35%' }} />
+            </div>
+          </div>
+          <div class="skel skel-line" style={{ width: '90%', marginTop: 14 }} />
+          <div class="skel skel-line" style={{ width: '70%' }} />
+        </div>
+      ))}
+    </div>
+  )
+}
 
 // ---------- Eingaben ----------
 
@@ -149,14 +225,38 @@ export function LevelChips({ opts, value, onChange }: { opts: Opt[]; value: Reco
   )
 }
 
+export const StarIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      fill="currentColor"
+      d="M12 2.6l2.75 6.05 6.6.68-4.95 4.43 1.4 6.5L12 16.95 6.2 20.26l1.4-6.5L2.65 9.33l6.6-.68z"
+      stroke="currentColor"
+      stroke-width="1"
+      stroke-linejoin="round"
+    />
+  </svg>
+)
+
+const STAR_WORDS = ['', 'Nicht meins', 'Geht so', 'Solide', 'Richtig gut', 'Herausragend']
+
 export function Stars({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   return (
-    <div class="stars" role="radiogroup" aria-label="Gesamtbewertung">
-      {[1, 2, 3, 4, 5].map((i) => (
-        <button type="button" class={i <= value ? 'on' : ''} aria-label={`${i} Sterne`} onClick={() => onChange(i === value ? 0 : i)}>
-          ★
-        </button>
-      ))}
+    <div>
+      <div class="stars" role="radiogroup" aria-label="Gesamtbewertung">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <button
+            type="button"
+            key={i <= value ? `on${i}-${value}` : `off${i}`}
+            class={i <= value ? 'on' : ''}
+            style={{ '--i': i }}
+            aria-label={`${i} Sterne`}
+            onClick={() => onChange(i === value ? 0 : i)}
+          >
+            <StarIcon />
+          </button>
+        ))}
+      </div>
+      <div class="star-label">{STAR_WORDS[value] || '\u00a0'}</div>
     </div>
   )
 }
@@ -164,18 +264,31 @@ export function Stars({ value, onChange }: { value: number; onChange: (v: number
 export const MiniStars = ({ value }: { value: number }) => {
   const full = Math.round(value)
   return (
-    <span class="stars mini" aria-label={`${value.toFixed(1)} von 5 Sternen`}>
-      {'★'.repeat(full)}
-      <span style={{ opacity: 0.25 }}>{'★'.repeat(5 - full)}</span>
+    <span class="ministars" role="img" aria-label={`${value.toFixed(1)} von 5 Sternen`}>
+      {[1, 2, 3, 4, 5].map((i) => (
+        <span class={i <= full ? '' : 'off'}>
+          <StarIcon />
+        </span>
+      ))}
     </span>
   )
 }
 
+/** Große Zahl mit Stern, z. B. „4.5 ★“. */
+export const Score = ({ value, label }: { value: number; label?: string }) => (
+  <span class="score" aria-label={`${value.toFixed(1)} von 5`}>
+    {value.toFixed(1)}
+    <StarIcon />
+    {label && <small>{label}</small>}
+  </span>
+)
+
 export function Slider(p: { label: string; low: string; high: string; value?: number; onChange: (v: number | undefined) => void; min?: number; max?: number; step?: number; fmt?: (v: number) => string }) {
   const { min = 1, max = 5, step = 1 } = p
   const set = p.value !== undefined
+  const pctFill = (((p.value ?? (min + max) / 2) - min) / (max - min)) * 100
   return (
-    <div class="slider">
+    <div class={'slider' + (set ? '' : ' unset')} style={{ '--p': `${pctFill}%` }}>
       <div class="top">
         <span>{p.label}</span>
         <span class="muted">
@@ -193,7 +306,6 @@ export function Slider(p: { label: string; low: string; high: string; value?: nu
         max={max}
         step={step}
         value={p.value ?? (min + max) / 2}
-        style={{ opacity: set ? 1 : 0.4 }}
         onInput={(e) => p.onChange(Number((e.target as HTMLInputElement).value))}
       />
       <div class="ends">
@@ -340,12 +452,41 @@ export function PhotoInput({ onFile, children }: { onFile: (f: File) => void; ch
   )
 }
 
-export const strainIcon = (type: string) =>
-  ({ indica: '🌙', 'indica-hybrid': '🌗', hybrid: '☯️', 'sativa-hybrid': '🌓', sativa: '☀️', cbd: '💧' })[type] ?? '🌿'
 
 export const pct = (r?: [number, number]) => {
   if (!r) return '–'
   const [a, b] = r
   if (b < 1) return '< 1 %'
   return a === b ? `${a} %` : `${Math.round(a)}–${Math.round(b)} %`
+}
+
+/** Generatives Sortenbild. */
+export function Art({ s, size, animated, alt }: { s: Parameters<typeof strainArtUrl>[0]; size?: 'sm' | 'md'; animated?: boolean; alt?: string }) {
+  return <img class={'art' + (size ? ' ' + size : '')} src={strainArtUrl(s, animated)} alt={alt ?? ''} loading="lazy" decoding="async" draggable={false} />
+}
+
+/** Farbpunkte der drei Leit-Terpene. */
+export function TerpDots({ s }: { s: Parameters<typeof strainPalette>[0] }) {
+  return (
+    <span class="terp-dots" aria-hidden="true">
+      {strainPalette(s).map(([c, l]) => (
+        <i style={{ background: `linear-gradient(135deg, ${l}, ${c})` }} />
+      ))}
+    </span>
+  )
+}
+
+/** Mini-Sortenbild für Chips. */
+export const ChipArt = ({ s }: { s: Parameters<typeof strainArtUrl>[0] }) => <img class="chip-art" src={strainArtUrl(s)} alt="" loading="lazy" />
+
+/** Hero-Bild: auf dem Handy formatfüllend, auf breiten Bildschirmen unscharfer Hintergrund + Quadrat. */
+export function HeroArt({ s }: { s: Parameters<typeof strainArtUrl>[0] }) {
+  return (
+    <>
+      <Art s={s} animated alt="" />
+      <span class="hero-square" aria-hidden="true">
+        <Art s={s} animated alt="" />
+      </span>
+    </>
+  )
 }

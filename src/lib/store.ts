@@ -142,8 +142,10 @@ export async function persistDoc(doc: Y.Doc, name: string, key: CryptoKey): Prom
     if (!queue.length) return
     const merged = Y.mergeUpdates(queue)
     queue = []
+    // Erst verschlüsseln, dann die Transaktion öffnen – sonst schließt IndexedDB sie während des await
+    const blob = await aesEncrypt(key, merged)
     const s = await tx('updates', 'readwrite')
-    await req(s.add({ doc: name, blob: await aesEncrypt(key, merged) }))
+    await req(s.add({ doc: name, blob }))
     if (++count > 150) await compact()
   }
   const onUpdate = (u: Uint8Array, origin: unknown) => {

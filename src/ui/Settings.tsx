@@ -12,6 +12,7 @@ import {
   startPairing,
 } from '../lib/app'
 import { changePin } from '../lib/vault'
+import { confetti } from '../lib/confetti'
 import { THEMES, autoLock, discreet, setAutoLock, setDiscreet, setTheme, theme } from '../lib/prefs'
 import { Avatar, Copy, PageHead, QR, Sheet, go, toast } from './kit'
 import { PinPad } from './Start'
@@ -234,6 +235,7 @@ function PairSheet({ onDone }: { onDone: () => void }) {
   const [p, setP] = useState<ReturnType<typeof startPairing> | null>(null)
   useEffect(() => {
     const s = startPairing(() => {
+      confetti()
       toast('Gerät gekoppelt')
       onDone()
     })

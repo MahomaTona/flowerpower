@@ -17,6 +17,7 @@ import {
 } from '../lib/app'
 import { randomPassword } from '../lib/crypto'
 import { pendingInvite } from '../lib/prefs'
+import { confetti } from '../lib/confetti'
 import { Avatar, Copy, PageHead, QR, Seg, Sheet, ShareBtn, go, route, toast } from './kit'
 import { onlineMembers, useData } from './data'
 
@@ -90,7 +91,8 @@ function CreateForm() {
         onClick={async () => {
           setBusy(true)
           await createGroup(name, pw)
-          toast('Gruppe gegründet – lade jetzt Leute ein')
+          confetti()
+          toast('🎉 Gruppe gegründet – lade jetzt Leute ein')
           setBusy(false)
           go('/group')
         }}

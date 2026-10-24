@@ -1,11 +1,12 @@
 // Live-Tasting: alle bewerten dieselbe Sorte, der Host deckt am Ende auf.
-import { useState } from 'preact/hooks'
+import { useEffect, useRef, useState } from 'preact/hooks'
+import { confetti } from '../lib/confetti'
 import { me as meSig } from '../lib/app'
 import { randomId } from '../lib/crypto'
 import { ownKey, type SessionData } from '../lib/model'
 import { statsFor } from '../lib/insights'
 import { AROMAS, opt } from '../lib/taxonomy'
-import { Avatar, Empty, MiniStars, PageHead, go, route, strainIcon, timeAgo, toast } from './kit'
+import { Art, Avatar, back, ChipArt, Empty, go, HeroArt, Icon, MiniStars, PageHead, route, timeAgo, toast } from './kit'
 import { RatingCard } from './Feed'
 import { Radar, SERIES_COLORS } from './Radar'
 import { aromaAxes, aromaValues, effectAxes, effectValues } from './Strains'
@@ -52,7 +53,7 @@ export function Sessions() {
         <h3>Neue Runde</h3>
         {chosen ? (
           <div class="row">
-            <span class="strain-ico">{strainIcon(chosen.type)}</span>
+            <Art s={chosen} size="sm" />
             <b class="grow">{chosen.name}</b>
             <button class="btn sm ghost" onClick={() => setStrainId(null)}>
               Ändern
@@ -64,7 +65,7 @@ export function Sessions() {
             <div class="chips">
               {options.map((s) => (
                 <button class="chip" onClick={() => setStrainId(s.id)}>
-                  {strainIcon(s.type)} {s.name}
+                  <ChipArt s={s} /> {s.name}
                 </button>
               ))}
             </div>
@@ -87,7 +88,7 @@ export function Sessions() {
               const n = d.snap.ratings.filter((r) => r.sessionId === s.id).length
               return (
                 <a class="card link row" href={`#/session/${encodeURIComponent(s.id)}`}>
-                  <span class="strain-ico">{st ? strainIcon(st.type) : '🌿'}</span>
+                  {st ? <Art s={st} size="sm" /> : <span class="art sm" />}
                   <div class="grow">
                     <b>{st?.name ?? 'Unbekannte Sorte'}</b>
                     <div class="tiny muted">
@@ -110,6 +111,13 @@ export function SessionView({ id }: { id: string }) {
   const me = meSig.value!
   const s = d.sessions.get(id)
   const [axis, setAxis] = useState<'wirkung' | 'aroma'>('wirkung')
+  // Beim Aufdecken feiern – auch auf den Geräten der anderen
+  const status = s?.status
+  const prev = useRef(status)
+  useEffect(() => {
+    if (prev.current === 'open' && status === 'revealed') confetti({ count: 180 })
+    prev.current = status
+  }, [status])
   if (!s || !d.rt)
     return (
       <div class="content">
@@ -131,22 +139,29 @@ export function SessionView({ id }: { id: string }) {
   const spread = all.length > 1 ? Math.max(...all.map((r) => r.overall)) - Math.min(...all.map((r) => r.overall)) : 0
   return (
     <div class="content">
-      <PageHead title="Live-Tasting" backTo />
-      <div class="card">
-        <div class="row">
-          <span class="strain-ico">{strain ? strainIcon(strain.type) : '🌿'}</span>
-          <div class="grow">
-            <a href={`#/strain/${encodeURIComponent(s.strainId)}`}>
-              <b>{strain?.name ?? 'Unbekannte Sorte'}</b>
-            </a>
-            <div class="tiny muted">
-              Host: {memberOf(d.snap, s.a).name}
-              {s.batch && ` · Charge ${s.batch}`} · {timeAgo(s.t)}
-            </div>
-          </div>
-          <span class={'badge' + (revealed ? ' gray' : '')}>{revealed ? 'aufgedeckt' : 'läuft'}</span>
+      <div class="hero short">
+        {strain ? <HeroArt s={strain} /> : <div class="art" />}
+        <div class="hero-top">
+          <button class="glassbtn" aria-label="Zurück" onClick={back}>
+            <Icon name="back" />
+          </button>
+          <span class={'badge' + (revealed ? '' : ' live')} style={{ alignSelf: 'center', background: 'rgba(0,0,0,.4)', color: '#fbf4e2' }}>
+            {revealed ? 'aufgedeckt' : 'läuft'}
+          </span>
         </div>
-        <div class="chipgroup-label">Abgegeben ({all.length})</div>
+        <div class="hero-text">
+          <span class="eyebrow">Live-Tasting · Host {memberOf(d.snap, s.a).name}</span>
+          <h1>{strain?.name ?? 'Unbekannte Sorte'}</h1>
+          <div class="sub">
+            {s.batch && `Charge ${s.batch} · `}
+            {timeAgo(s.t)}
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="chipgroup-label" style={{ marginTop: 0 }}>
+          Abgegeben ({all.length})
+        </div>
         <div class="row wrap">
           {all.map((r) => {
             const m = memberOf(d.snap, r.a)
@@ -234,7 +249,7 @@ export function SessionView({ id }: { id: string }) {
               {[...all]
                 .sort((a, b) => b.overall - a.overall)
                 .map((r) => (
-                  <RatingCard r={r} rt={d.rt} snap={d.snap} compact />
+                  <RatingCard r={r} rt={d.rt} snap={d.snap} strain={strain} />
                 ))}
             </div>
           </div>

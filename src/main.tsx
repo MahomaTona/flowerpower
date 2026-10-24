@@ -4,7 +4,7 @@ import { registerSW } from 'virtual:pwa-register'
 import './styles.css'
 import { activeGroup, boot, groups, groupsTick, lockNow, pairRequest, phase, setActiveGroup } from './lib/app'
 import { appName, autoLock, pendingInvite } from './lib/prefs'
-import { Icon, Logo, Sheet, Toast, go, route } from './ui/kit'
+import { Aurora, BloomLogo, Icon, Logo, Sheet, Toast, go, route } from './ui/kit'
 import { LockScreen, Welcome } from './ui/Start'
 import { Feed } from './ui/Feed'
 import { Compare, StrainDetail, StrainForm, StrainList } from './ui/Strains'
@@ -35,15 +35,22 @@ function App() {
       else if (route.peek().parts[0] === 'pair') go('/settings')
     }
   }, [p])
-  if (p === 'loading')
-    return (
-      <div class="fullscreen center">
-        <Logo class="hero-logo" />
-      </div>
-    )
-  if (p === 'welcome') return <Welcome />
-  if (p === 'locked') return <LockScreen />
-  return <Shell />
+  return (
+    <>
+      <Aurora />
+      {p === 'loading' ? (
+        <div class="fullscreen center">
+          <BloomLogo />
+        </div>
+      ) : p === 'welcome' ? (
+        <Welcome />
+      ) : p === 'locked' ? (
+        <LockScreen />
+      ) : (
+        <Shell />
+      )}
+    </>
+  )
 }
 
 const NAV = [
@@ -65,7 +72,7 @@ function Shell() {
     <div class="shell">
       <nav class="nav" aria-label="Hauptnavigation">
         <div class="brand">
-          <Logo /> {appName()}
+          <Logo /> <span class="brand-name">{appName()}</span>
         </div>
         {NAV.map(([k, label, icon]) => (
           <a href={`#/${k}`} class={(navOn(k) ? 'on ' : '') + (k === 'rate' ? 'plus' : '')} aria-current={navOn(k) ? 'page' : undefined}>
@@ -117,7 +124,7 @@ function Shell() {
             <Icon name="settings" />
           </a>
         </header>
-        <main>
+        <main class="page" key={page + '/' + (r.parts[1] ?? '')}>
           <Page page={page} id={r.parts[1]} />
         </main>
       </div>

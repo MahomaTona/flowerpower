@@ -3,7 +3,7 @@ import { useState } from 'preact/hooks'
 import { pWishlist, setProfile } from '../lib/app'
 import { byStrain, recommend, tasteProfile } from '../lib/insights'
 import { AROMAS, AVATARS, EFFECTS, FORMS, TERPENES, opt, optLabel } from '../lib/taxonomy'
-import { Avatar, Empty, MiniStars, Sheet, go, strainIcon } from './kit'
+import { Art, Avatar, ChipArt, Empty, go, MiniStars, Sheet } from './kit'
 import { RatingCard } from './Feed'
 import { Radar } from './Radar'
 import { effectAxes, effectValues } from './Strains'
@@ -103,7 +103,7 @@ export function Me() {
           <div class="list">
             {recs.map((r) => (
               <a class="card link strain-row" href={`#/strain/${encodeURIComponent(r.strain.id)}`}>
-                <span class="strain-ico">{strainIcon(r.strain.type)}</span>
+                <Art s={r.strain} size="sm" />
                 <div class="grow">
                   <b>{r.strain.name}</b>
                   <div class="tiny muted">{r.reason}</div>
@@ -123,7 +123,7 @@ export function Me() {
           <div class="chips">
             {wish.map((s) => (
               <a class="chip" style={{ textDecoration: 'none' }} href={`#/strain/${encodeURIComponent(s!.id)}`}>
-                {strainIcon(s!.type)} {s!.name}
+                <ChipArt s={s!} /> {s!.name}
               </a>
             ))}
           </div>
@@ -137,7 +137,7 @@ export function Me() {
         ) : (
           <div class="list">
             {(showAll ? d.mine : d.mine.slice(0, 5)).map((r) => (
-              <RatingCard r={r} rt={d.rt} snap={d.snap} strainName={d.strainMap.get(r.strainId)?.name} strainType={d.strainMap.get(r.strainId)?.type} compact />
+              <RatingCard r={r} rt={d.rt} snap={d.snap} strain={d.strainMap.get(r.strainId)} />
             ))}
             {!showAll && d.mine.length > 5 && (
               <button class="btn" onClick={() => setShowAll(true)}>

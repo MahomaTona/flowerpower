@@ -5,8 +5,9 @@ import { randomId, sha256hex } from '../lib/crypto'
 import { compressImage, photoUrl } from '../lib/image'
 import { ownKey, type RatingData } from '../lib/model'
 import { ASH, AROMA_GROUPS, BURN, COMBUSTION, EFFECTS, FORMS, QUALITY, SIDE_EFFECTS, SOURCES, VAPE } from '../lib/taxonomy'
-import { ChipSelect, Empty, Icon, LevelChips, PageHead, PhotoInput, Seg, SingleSelect, Slider, Stars, back, go, route, strainIcon, toast } from './kit'
+import { Art, back, ChipArt, ChipSelect, Empty, go, HeroArt, Icon, LevelChips, MiniStars, PageHead, PhotoInput, route, Seg, SingleSelect, Slider, Stars, toast } from './kit'
 import { useData } from './data'
+import { MILESTONES, confetti } from '../lib/confetti'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -88,7 +89,15 @@ export function RateForm() {
       data.id = finalId
       if (isGroup) await d.rt!.model.put(me, 'ratings', finalId, data)
       else pPrivate.set(finalId, data)
-      toast(existing ? 'Bewertung aktualisiert' : isGroup ? 'Mit der Gruppe geteilt' : 'Privat gespeichert')
+      const triedBefore = new Set(d.mine.map((r) => r.strainId))
+      const triedNow = triedBefore.size + (triedBefore.has(strainId) ? 0 : 1)
+      if (!existing && triedNow !== triedBefore.size && MILESTONES.includes(triedNow)) {
+        confetti()
+        toast(triedNow === 1 ? '🎉 Deine erste Notiz!' : `🎉 ${triedNow} Sorten probiert!`)
+      } else if (!existing && overall === 5) {
+        confetti({ count: 70 })
+        toast('✨ Fünf Sterne – notiert!')
+      } else toast(existing ? 'Bewertung aktualisiert' : isGroup ? 'Mit der Gruppe geteilt' : 'Privat gespeichert')
       if (sessionId) go(`/session/${encodeURIComponent(sessionId)}`)
       else go(`/strain/${encodeURIComponent(strainId)}`)
     } finally {
@@ -108,19 +117,26 @@ export function RateForm() {
 
   return (
     <div class="content">
-      <PageHead title={existing ? 'Bewertung bearbeiten' : 'Bewerten'} backTo />
-      {session && <div class="banner mb">🍷 Live-Tasting – deine Bewertung bleibt verdeckt, bis aufgedeckt wird.</div>}
-      <div class="card row">
-        <span class="strain-ico">{strainIcon(strain.type)}</span>
-        <b class="grow">{strain.name}</b>
-        {!session && !existing && (
-          <button class="btn sm ghost" onClick={() => setStrainId(undefined)}>
-            Ändern
+      <div class="hero short">
+        <HeroArt s={strain} />
+        <div class="hero-top">
+          <button class="glassbtn" aria-label="Zurück" onClick={back}>
+            <Icon name="back" />
           </button>
-        )}
+          {!session && !existing && (
+            <button class="btn sm" style={{ background: 'rgba(0,0,0,.35)', color: '#fff', borderColor: 'rgba(255,255,255,.2)' }} onClick={() => setStrainId(undefined)}>
+              Andere Sorte
+            </button>
+          )}
+        </div>
+        <div class="hero-text">
+          <span class="eyebrow">{existing ? 'Notiz bearbeiten' : session ? 'Live-Tasting' : 'Neue Notiz'}</span>
+          <h1>{strain.name}</h1>
+        </div>
       </div>
+      {session && <div class="banner mb">🍷 Deine Bewertung bleibt verdeckt, bis der Host aufdeckt.</div>}
 
-      <Section title="Wann & woher">
+      <Section n={1} done={!!source || !!batch} title="Wann & woher">
         <label class="field">
           <span>Datum</span>
           <input class="input" type="date" value={date} max={today()} onInput={(e) => setDate((e.target as HTMLInputElement).value || today())} />
@@ -133,7 +149,7 @@ export function RateForm() {
         </label>
       </Section>
 
-      <Section title="Konsumform">
+      <Section n={2} done={!!form} title="Konsumform">
         <SingleSelect opts={FORMS} value={form} onChange={setForm} />
         {form && VAPE.has(form) && (
           <div class="mt">
@@ -142,7 +158,7 @@ export function RateForm() {
         )}
       </Section>
 
-      <Section title="Optik & Qualität">
+      <Section n={3} done={Object.keys(quality).length > 0} title="Optik & Qualität">
         <div class="stack">
           {QUALITY.map((x) => (
             <Slider label={x.label} low={x.low} high={x.high} value={quality[x.id]} onChange={(v) => setQuality(v === undefined ? omit(quality, x.id) : { ...quality, [x.id]: v })} />
@@ -158,7 +174,7 @@ export function RateForm() {
         )}
       </Section>
 
-      <Section title="Geruch">
+      <Section n={4} done={aromas.length > 0} title="Geruch">
         {AROMA_GROUPS.map((g) => (
           <>
             <div class="chipgroup-label">{g.label}</div>
@@ -168,6 +184,8 @@ export function RateForm() {
       </Section>
 
       <Section
+        n={5}
+        done={tastes.length > 0}
         title="Geschmack"
         right={
           aromas.length > 0 && (
@@ -185,14 +203,14 @@ export function RateForm() {
         ))}
       </Section>
 
-      <Section title="Wirkung">
+      <Section n={6} done={Object.keys(effects).length > 0} title="Wirkung">
         <p class="tiny muted">Mehrmals tippen für die Stärke: leicht → deutlich → stark → aus.</p>
         <LevelChips opts={EFFECTS} value={effects} onChange={setEffects} />
         <div class="chipgroup-label">Nebenwirkungen</div>
         <LevelChips opts={SIDE_EFFECTS} value={effects} onChange={setEffects} />
       </Section>
 
-      <Section title="Gesamteindruck">
+      <Section n={7} done={overall > 0} title="Gesamteindruck">
         <Stars value={overall} onChange={setOverall} />
         <div class="mt">
           <Seg
@@ -231,7 +249,7 @@ export function RateForm() {
       </Section>
 
       {d.rt && !session && (
-        <Section title="Sichtbar für">
+        <Section n={8} done title="Sichtbar für">
           <Seg
             value={share}
             onChange={setShare}
@@ -243,9 +261,13 @@ export function RateForm() {
         </Section>
       )}
 
-      <div class="stack mt" style={{ position: 'sticky', bottom: 'calc(84px + env(safe-area-inset-bottom))' }}>
-        <button class="btn primary block" disabled={!overall || busy} onClick={save}>
-          {overall ? (busy ? 'Speichere …' : 'Speichern') : 'Bitte Sterne vergeben'}
+      <div class="savebar">
+        <div class="grow" style={{ paddingLeft: 6 }}>
+          {overall ? <MiniStars value={overall} /> : <span class="small muted">Noch keine Sterne</span>}
+          <div class="tiny muted">{isGroup ? `👥 ${d.rt!.entry.name}` : '🙈 privat'}</div>
+        </div>
+        <button class="btn primary" disabled={!overall || busy} onClick={save}>
+          {busy ? 'Speichere …' : existing ? 'Aktualisieren' : 'Speichern'}
         </button>
       </div>
       {existing && (
@@ -263,10 +285,11 @@ function omit(o: Record<string, number>, k: string) {
   return n
 }
 
-function Section({ title, right, children }: { title: string; right?: preact.ComponentChildren; children: preact.ComponentChildren }) {
+function Section({ n, done, title, right, children }: { n: number; done?: boolean; title: string; right?: preact.ComponentChildren; children: preact.ComponentChildren }) {
   return (
-    <div class="section">
-      <div class="row between">
+    <div class="form-section">
+      <div class="section-title">
+        <span class={'n' + (done ? ' done' : '')}>{done ? '✓' : n}</span>
         <h3>{title}</h3>
         {right}
       </div>
@@ -278,54 +301,48 @@ function Section({ title, right, children }: { title: string; right?: preact.Com
 function StrainPicker({ onPick }: { onPick: (id: string) => void }) {
   const d = useData()
   const [q, setQ] = useState('')
-  const recent = [...new Set(d.mine.map((r) => r.strainId))].slice(0, 6).map((id) => d.strainMap.get(id)).filter(Boolean)
+  const recent = [...new Set(d.mine.map((r) => r.strainId))].slice(0, 8).map((id) => d.strainMap.get(id)).filter(Boolean)
   const ql = q.trim().toLowerCase()
-  const list = ql ? d.strains.filter((s) => s.name.toLowerCase().includes(ql)).slice(0, 12) : []
+  const list = ql ? d.strains.filter((s) => s.name.toLowerCase().includes(ql) || s.lineage?.toLowerCase().includes(ql)) : d.strains
   return (
-    <div class="content">
-      <PageHead title="Welche Sorte?" backTo />
-      <input class="input" type="search" autoFocus placeholder="Sorte suchen …" value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
+    <div class="content wide">
+      <PageHead title="Was probierst du?" backTo />
+      <div class="search mb">
+        <Icon name="search" />
+        <input class="input" type="search" autoFocus placeholder="Sorte suchen …" value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
+      </div>
       {!ql && recent.length > 0 && (
         <>
           <div class="chipgroup-label">Zuletzt bewertet</div>
-          <div class="chips">
+          <div class="chips mb">
             {recent.map((s) => (
               <button class="chip" onClick={() => onPick(s!.id)}>
-                {strainIcon(s!.type)} {s!.name}
+                <ChipArt s={s!} /> {s!.name}
               </button>
             ))}
           </div>
         </>
       )}
-      {!ql && (
-        <>
-          <div class="chipgroup-label">Alle Sorten</div>
-          <div class="chips">
-            {d.strains.slice(0, 60).map((s) => (
-              <button class="chip" onClick={() => onPick(s.id)}>
-                {strainIcon(s.type)} {s.name}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-      {ql && (
-        <div class="list mt">
-          {list.map((s) => (
-            <button class="card link strain-row" style={{ textAlign: 'left', width: '100%' }} onClick={() => onPick(s.id)}>
-              <span class="strain-ico">{strainIcon(s.type)}</span>
-              <b class="grow">{s.name}</b>
+      {list.length ? (
+        <div class="gallery">
+          {list.slice(0, 48).map((s, i) => (
+            <button class="gcard" style={{ '--i': i, padding: 0, textAlign: 'left', font: 'inherit', cursor: 'pointer' }} onClick={() => onPick(s.id)}>
+              <div class="art-wrap">
+                <Art s={s} />
+                <div class="over">
+                  <div class="name">{s.name}</div>
+                </div>
+              </div>
             </button>
           ))}
-          {!list.length && (
-            <Empty icon="🌱">
-              <p>„{q.trim()}“ ist noch nicht in der Liste.</p>
-              <button class="btn primary" onClick={() => go(`/strain-new?name=${encodeURIComponent(q.trim())}`)}>
-                Als neue Sorte anlegen
-              </button>
-            </Empty>
-          )}
         </div>
+      ) : (
+        <Empty icon="🌱">
+          <p>„{q.trim()}“ ist noch nicht in der Liste.</p>
+          <button class="btn primary" onClick={() => go(`/strain-new?name=${encodeURIComponent(q.trim())}`)}>
+            Als neue Sorte anlegen
+          </button>
+        </Empty>
       )}
     </div>
   )

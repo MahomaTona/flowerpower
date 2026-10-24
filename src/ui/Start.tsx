@@ -2,8 +2,8 @@
 import { useEffect, useState } from 'preact/hooks'
 import { createAccount, readBackup, receivePairing, resetEverything, unlockWithPin, type Restore } from '../lib/app'
 import { AVATARS } from '../lib/taxonomy'
-import { THEMES, appName, failedPins, setTheme, theme } from '../lib/prefs'
-import { Logo, route } from './kit'
+import { THEMES, appName, discreet, failedPins, setTheme, theme } from '../lib/prefs'
+import { BloomLogo, route } from './kit'
 import { ThemePicker } from './Settings'
 
 const PIN_LEN = 6
@@ -104,7 +104,7 @@ export function LockScreen() {
     )
   return (
     <div class="fullscreen">
-      <Logo class="hero-logo" />
+      <BloomLogo />
       {wait > 0 ? (
         <p class="center">Zu viele Versuche. Bitte warte {wait} s.</p>
       ) : (
@@ -145,8 +145,8 @@ export function Welcome() {
   const invite = route.value.parts[0] === 'join'
   return (
     <div class="fullscreen">
-      <Logo class="hero-logo" />
-      <h1 class="center">{appName()}</h1>
+      <BloomLogo />
+      <h1 class="welcome-title">{discreet.value ? 'Notizen' : <>Flower<em>Power</em></>}</h1>
       <p class="center muted">
         Euer gemeinsames Connoisseur-Notizbuch. Alles bleibt auf euren Geräten und wird direkt zwischen euch abgeglichen – ohne Server, ohne Konto.
       </p>
@@ -249,7 +249,7 @@ function ChoosePin({ name, avatar, restore, onBack }: { name?: string; avatar?: 
   if (busy)
     return (
       <div class="fullscreen center">
-        <Logo class="hero-logo" />
+        <BloomLogo />
         <p>Schlüssel werden erzeugt …</p>
       </div>
     )
